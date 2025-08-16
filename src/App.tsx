@@ -51,7 +51,7 @@ function LoginButton() {
   );
 }
 
-async function saveToSpotify(mix) {
+async function saveToSpotify(mix: Mix) {
   const r = await fetch(`${API_BASE}/api/spotify/save-playlist`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -63,34 +63,6 @@ async function saveToSpotify(mix) {
   });
   if (!r.ok) throw new Error("save failed");
   return r.json(); // { id, url, embedUrl }
-}
-
-function TrackRow({ t, playingId, setPlayingId }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-    if (playingId === t.id) audioRef.current.play();
-    else audioRef.current.pause();
-  }, [playingId, t.id]);
-
-  return (
-    <div>
-      <strong>{t.title}</strong> — {t.artist}
-      {t.preview ? (
-        <>
-          <button
-            onClick={() => setPlayingId(playingId === t.id ? null : t.id)}
-          >
-            {playingId === t.id ? "Pause" : "Play preview"}
-          </button>
-          <audio ref={audioRef} src={t.preview} preload="none" />
-        </>
-      ) : (
-        <span style={{ opacity: 0.6, marginLeft: 8 }}>(no preview)</span>
-      )}
-    </div>
-  );
 }
 
 // ========================= Accent palettes (full) =========================
@@ -203,7 +175,7 @@ function RootApp() {
   }, [aspect, height]);
 
   // Theme & Accent (persisted)
-  const [theme, setTheme] = useLocalStorage<"dark" | "light">(
+  const [theme] = useLocalStorage<"dark" | "light">(
     "moodmix_theme",
     "dark"
   );
@@ -1047,34 +1019,6 @@ function Checkbox({
     </label>
   );
 }
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: string[];
-}) {
-  return (
-    <label className="text-sm inline-flex items-center gap-2">
-      <span className="text-zinc-400">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="px-2 py-1 rounded border border-zinc-700 bg-transparent"
-      >
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o} min
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
 function ToggleField({
   label,
   checked,
@@ -1723,11 +1667,11 @@ function titleFrom(tokens: string[], mins: number, instrumentalOnly: boolean) {
   const lyric = instrumentalOnly ? "(Instrumental) " : "";
   return (cap ? cap + " Mix" : "Custom Mix") + ` · ${lyric}${mins} min`;
 }
-function recommendFromPrompt(
-  prompt: string,
-  profile: UserProfile,
-  opts: MixOptions
-): Mix {
+  export function recommendFromPrompt(
+    prompt: string,
+    profile: UserProfile,
+    opts: MixOptions
+  ): Mix {
   const tokens = simpleTokenize(prompt);
   const ranked = CATALOG.map((tr) => ({
     tr,
