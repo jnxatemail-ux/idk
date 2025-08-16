@@ -11,7 +11,14 @@ import React, {
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 
-const API_BASE = "https://dtrlrc-3002.csb.app";
+// In Codesandbox the frontend runs on port 5173 and the backend on 3002.
+// Derive the API base URL from the current origin unless an explicit override
+// is provided via VITE_API_BASE.
+const API_BASE =
+  (import.meta as any).env?.VITE_API_BASE ||
+  (window.location.origin.includes("csb.app")
+    ? window.location.origin.replace(/-\d+(?=\.csb\.app)/, "-3002")
+    : window.location.origin.replace(/:\d+$/, ":3002"));
 // TEMP: expose so you can see it in the console
 console.log("API_BASE =", API_BASE);
 (window as any).API_BASE = API_BASE;
@@ -43,34 +50,76 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SpotifyLoginButton() {
+function SpotifyLoginButton({ loggedIn }: { loggedIn?: boolean }) {
   return (
     <button
       onClick={() => (window.location.href = `${API_BASE}/auth/login`)}
-      className="px-2 py-1 text-xs rounded-lg border border-zinc-700/80 bg-zinc-900/70"
+      className={`px-2 py-1 text-xs rounded-lg border bg-zinc-900/70 inline-flex items-center ${
+        loggedIn
+          ? "border-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]"
+          : "border-zinc-700/80"
+      }`}
     >
+      {loggedIn && (
+        <span
+          className="mr-1 h-2 w-2 rounded-full bg-red-500 animate-pulse"
+          aria-hidden
+        />
+      )}
       Spotify
     </button>
   );
 }
 
-function AppleMusicLoginButton() {
+function AppleMusicLoginButton({
+  loggedIn,
+  onLogin,
+}: {
+  loggedIn?: boolean;
+  onLogin: () => void;
+}) {
   return (
     <button
-      onClick={() => (window.location.href = `${API_BASE}/auth/apple`)}
-      className="px-2 py-1 text-xs rounded-lg border border-zinc-700/80 bg-zinc-900/70"
+      onClick={onLogin}
+      className={`px-2 py-1 text-xs rounded-lg border bg-zinc-900/70 inline-flex items-center ${
+        loggedIn
+          ? "border-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]"
+          : "border-zinc-700/80"
+      }`}
     >
+      {loggedIn && (
+        <span
+          className="mr-1 h-2 w-2 rounded-full bg-red-500 animate-pulse"
+          aria-hidden
+        />
+      )}
       Apple Music
     </button>
   );
 }
 
-function YouTubeMusicLoginButton() {
+function YouTubeMusicLoginButton({
+  loggedIn,
+  onLogin,
+}: {
+  loggedIn?: boolean;
+  onLogin: () => void;
+}) {
   return (
     <button
-      onClick={() => (window.location.href = `${API_BASE}/auth/youtube`)}
-      className="px-2 py-1 text-xs rounded-lg border border-zinc-700/80 bg-zinc-900/70"
+      onClick={onLogin}
+      className={`px-2 py-1 text-xs rounded-lg border bg-zinc-900/70 inline-flex items-center ${
+        loggedIn
+          ? "border-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]"
+          : "border-zinc-700/80"
+      }`}
     >
+      {loggedIn && (
+        <span
+          className="mr-1 h-2 w-2 rounded-full bg-red-500 animate-pulse"
+          aria-hidden
+        />
+      )}
       YouTube Music
     </button>
   );
@@ -273,6 +322,59 @@ function RootApp() {
       doNotPlay: [],
     }
   );
+  type Service = "spotify" | "apple" | "youtube";
+  const [serviceLogins, setServiceLogins] = useState<Record<Service, boolean>>({
+    spotify: false,
+    apple: false,
+    youtube: false,
+  });
+
+  const handleAppleLogin = () => {
+    setServiceLogins((s) => ({ ...s, apple: true }));
+    try {
+      localStorage.setItem("moodmix_login_apple", "1");
+    } catch {}
+  };
+  const handleYouTubeLogin = () => {
+    setServiceLogins((s) => ({ ...s, youtube: true }));
+    try {
+      localStorage.setItem("moodmix_login_youtube", "1");
+    } catch {}
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/api/auth/status`, {
+          credentials: "include",
+        });
+        if (r.ok) setServiceLogins((s) => ({ ...s, spotify: true }));
+      } catch {}
+    })();
+
+    const match = window.location.hash.match(/logged-in=([^&]+)/);
+    let svc = match ? match[1] : null;
+    if (svc) {
+      if (svc === "1") svc = "spotify";
+      setServiceLogins((s) => ({ ...s, [svc as Service]: true }));
+      try {
+        localStorage.setItem(`moodmix_login_${svc}`, "1");
+      } catch {}
+      history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search
+      );
+    } else {
+      for (const s of ["spotify", "apple", "youtube"] as const) {
+        try {
+          if (localStorage.getItem(`moodmix_login_${s}`) === "1") {
+            setServiceLogins((v) => ({ ...v, [s]: true }));
+          }
+        } catch {}
+      }
+    }
+  }, []);
   useEffect(() => {
     const onReady = async () => {
       // Needs a logged-in Spotify cookie from /auth/callback
@@ -374,9 +476,15 @@ function RootApp() {
       <header className="relative px-4 py-5 sm:py-7 lg:py-8 border-b border-zinc-800/70 backdrop-blur-sm bg-zinc-950/40 grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-2">
         {/* LEFT: music service logins */}
         <div className="hidden sm:flex items-center gap-2">
-          <SpotifyLoginButton />
-          <AppleMusicLoginButton />
-          <YouTubeMusicLoginButton />
+          <SpotifyLoginButton loggedIn={serviceLogins.spotify} />
+          <AppleMusicLoginButton
+            loggedIn={serviceLogins.apple}
+            onLogin={handleAppleLogin}
+          />
+          <YouTubeMusicLoginButton
+            loggedIn={serviceLogins.youtube}
+            onLogin={handleYouTubeLogin}
+          />
         </div>
 
         {/* CENTER: Logo (stays centered) */}
@@ -422,9 +530,15 @@ function RootApp() {
 
         {/* MOBILE: music service logins pinned to top-left */}
         <div className="sm:hidden absolute left-3 top-3 flex gap-2">
-          <SpotifyLoginButton />
-          <AppleMusicLoginButton />
-          <YouTubeMusicLoginButton />
+          <SpotifyLoginButton loggedIn={serviceLogins.spotify} />
+          <AppleMusicLoginButton
+            loggedIn={serviceLogins.apple}
+            onLogin={handleAppleLogin}
+          />
+          <YouTubeMusicLoginButton
+            loggedIn={serviceLogins.youtube}
+            onLogin={handleYouTubeLogin}
+          />
         </div>
 
         {/* MOBILE: ONLY the sign button pinned to top-right */}

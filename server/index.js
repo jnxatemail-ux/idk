@@ -7,13 +7,31 @@ import cookieParser from "cookie-parser";
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
-const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI; // e.g. https://dtrlrc-3002.csb.app/auth/callback
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN; // e.g. https://dtrlrc-5173.csb.app
+
+// Express setup
+const app = express();
+app.use(cookieParser());
+app.use(cors());
+app.use(express.json());
+
+// Helpers to derive URLs in Codesandbox/localhost environments
+function getRedirectUri(req) {
+  const fallback = `${req.protocol}://${req.get("host")}/auth/callback`;
+  return process.env.SPOTIFY_REDIRECT_URI || fallback;
+}
+function getFrontendOrigin(req) {
+  if (process.env.FRONTEND_ORIGIN) return process.env.FRONTEND_ORIGIN;
+  const host = req.get("host");
+  if (host.includes(".csb.app")) {
+    return `${req.protocol}://${host.replace(/-\d+(?=\.csb\.app)/, "-5173")}`;
+  }
+  return `${req.protocol}://${host.replace(/:\d+$/, ":5173")}`;
+}
 
 // super-light in-memory sessions (fine for sandbox/testing)
 const sessions = new Map();
 // Start login: redirect to Spotify
-app.get("/auth/login", (_req, res) => {
+app.get("/auth/login", (req, res) => {
   const state = crypto.randomBytes(8).toString("hex");
   const scopes = [
     "playlist-modify-public",
@@ -28,7 +46,7 @@ app.get("/auth/login", (_req, res) => {
   const url = new URL("https://accounts.spotify.com/authorize");
   url.searchParams.set("client_id", SPOTIFY_CLIENT_ID);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("redirect_uri", REDIRECT_URI);
+  url.searchParams.set("redirect_uri", getRedirectUri(req));
   url.searchParams.set("scope", scopes);
   url.searchParams.set("state", state);
 
@@ -51,7 +69,7 @@ app.get("/auth/callback", async (req, res) => {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
       code: code.toString(),
-      redirect_uri: REDIRECT_URI,
+      redirect_uri: getRedirectUri(req),
     });
 
     const r = await fetch("https://accounts.spotify.com/api/token", {
@@ -87,7 +105,7 @@ app.get("/auth/callback", async (req, res) => {
       sameSite: "lax",
       maxAge: 30 * 24 * 3600 * 1000,
     });
-    res.redirect(`${FRONTEND_ORIGIN}/#logged-in=1`);
+    res.redirect(`${getFrontendOrigin(req)}/#logged-in=1`);
   } catch (e) {
     console.error(e);
     res.status(500).send("Auth failed");
@@ -203,12 +221,6 @@ app.get("/api/spotify/token", requireAuth, async (req, res) => {
   const access = await getUserAccessToken(req.sid);
   res.json({ access_token: access });
 });
-// somewhere central
-
-const app = express();
-app.use(cookieParser());
-app.use(cors());
-app.use(express.json());
 // ---- quick diagnostics ----
 app.get("/_debug/env", (_req, res) => {
   res.json({
