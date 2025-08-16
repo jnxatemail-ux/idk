@@ -43,10 +43,35 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-function LoginButton() {
+function SpotifyLoginButton() {
   return (
-    <button onClick={() => (window.location.href = `${API_BASE}/auth/login`)}>
-      Log in with Spotify
+    <button
+      onClick={() => (window.location.href = `${API_BASE}/auth/login`)}
+      className="px-2 py-1 text-xs rounded-lg border border-zinc-700/80 bg-zinc-900/70"
+    >
+      Spotify
+    </button>
+  );
+}
+
+function AppleMusicLoginButton() {
+  return (
+    <button
+      onClick={() => (window.location.href = `${API_BASE}/auth/apple`)}
+      className="px-2 py-1 text-xs rounded-lg border border-zinc-700/80 bg-zinc-900/70"
+    >
+      Apple Music
+    </button>
+  );
+}
+
+function YouTubeMusicLoginButton() {
+  return (
+    <button
+      onClick={() => (window.location.href = `${API_BASE}/auth/youtube`)}
+      className="px-2 py-1 text-xs rounded-lg border border-zinc-700/80 bg-zinc-900/70"
+    >
+      YouTube Music
     </button>
   );
 }
@@ -347,8 +372,12 @@ function RootApp() {
       </div>
 
       <header className="relative px-4 py-5 sm:py-7 lg:py-8 border-b border-zinc-800/70 backdrop-blur-sm bg-zinc-950/40 grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-2">
-        {/* LEFT (desktop spacer) */}
-        <div className="hidden sm:block" />
+        {/* LEFT: music service logins */}
+        <div className="hidden sm:flex items-center gap-2">
+          <SpotifyLoginButton />
+          <AppleMusicLoginButton />
+          <YouTubeMusicLoginButton />
+        </div>
 
         {/* CENTER: Logo (stays centered) */}
         <div className="justify-self-center origin-center scale-100 md:scale-[1.25] lg:scale-[1.4]">
@@ -358,7 +387,6 @@ function RootApp() {
         {/* RIGHT: Desktop controls (unchanged) */}
         <div className="hidden sm:flex justify-self-end items-center gap-2">
           <AccentPicker value={accent} onChange={setAccent} />
-          <LoginButton /> {/* ← add this */}
           {user ? (
             <div className="flex items-center gap-2">
               <div
@@ -390,6 +418,13 @@ function RootApp() {
         {/* MOBILE: Accent picker centered UNDER the logo */}
         <div className="sm:hidden mt-2 flex items-center justify-center">
           <AccentPicker value={accent} onChange={setAccent} />
+        </div>
+
+        {/* MOBILE: music service logins pinned to top-left */}
+        <div className="sm:hidden absolute left-3 top-3 flex gap-2">
+          <SpotifyLoginButton />
+          <AppleMusicLoginButton />
+          <YouTubeMusicLoginButton />
         </div>
 
         {/* MOBILE: ONLY the sign button pinned to top-right */}
