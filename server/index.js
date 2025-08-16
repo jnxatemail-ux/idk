@@ -7,8 +7,8 @@ import cookieParser from "cookie-parser";
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
-const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI; // e.g. https://dtrlrc-3002.csb.app/auth/callback
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN; // e.g. https://dtrlrc-5173.csb.app
+const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI; // e.g. https://your-sandbox-id-3002.csb.app/auth/callback
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN; // e.g. https://your-sandbox-id-5173.csb.app
 
 // super-light in-memory sessions (fine for sandbox/testing)
 const sessions = new Map();

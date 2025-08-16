@@ -11,7 +11,11 @@ import React, {
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 
-const API_BASE = "https://dtrlrc-3002.csb.app";
+const API_BASE =
+  import.meta.env.VITE_API_BASE ??
+  (window.location.origin.includes("csb.app")
+    ? window.location.origin.replace(/-\d+\.csb\.app$/, "-3002.csb.app")
+    : window.location.origin.replace(/:\d+$/, ":3002"));
 // TEMP: expose so you can see it in the console
 console.log("API_BASE =", API_BASE);
 (window as any).API_BASE = API_BASE;
