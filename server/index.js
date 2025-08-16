@@ -5,6 +5,11 @@ import fetch from "node-fetch";
 import crypto from "crypto";
 import cookieParser from "cookie-parser";
 
+const app = express();
+app.use(cookieParser());
+app.use(cors());
+app.use(express.json());
+
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI; // e.g. https://your-sandbox-id-3002.csb.app/auth/callback
@@ -203,12 +208,6 @@ app.get("/api/spotify/token", requireAuth, async (req, res) => {
   const access = await getUserAccessToken(req.sid);
   res.json({ access_token: access });
 });
-// somewhere central
-
-const app = express();
-app.use(cookieParser());
-app.use(cors());
-app.use(express.json());
 // ---- quick diagnostics ----
 app.get("/_debug/env", (_req, res) => {
   res.json({
