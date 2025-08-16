@@ -414,7 +414,21 @@ function RootApp() {
       setCurrentMix(mix); // updates your "Now Playing" section
     } catch (e) {
       console.error(e);
-      alert("Could not build Spotify mix.");
+      try {
+        // Fallback to local recommender when server mixing fails
+        const fallback = recommendFromPrompt(
+          prompt,
+          profile,
+          {
+            targetSeconds: (Number(targetMinutes) || 30) * 60,
+            instrumentalOnly,
+          }
+        );
+        setCurrentMix(fallback);
+      } catch (err) {
+        console.error(err);
+        alert("Could not build Spotify mix.");
+      }
     } finally {
       setIsGenerating(false);
     }
