@@ -20,14 +20,12 @@ const API_BASE =
 console.log("API_BASE =", API_BASE);
 (window as any).API_BASE = API_BASE;
 
-// =========================== Auth (demo-ready) ===========================
+// =========================== Auth (session-based) ===========================
 export type User = { id: string; name: string; email: string } | null;
 
 type AuthContextType = {
   user: User;
-  signInDemo: (name: string, email: string) => Promise<void>;
   signOut: () => Promise<void>;
-  // signInWithGoogle?: () => Promise<void>; // TODO(provider)
 };
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 function useAuth() {
@@ -36,12 +34,24 @@ function useAuth() {
   return ctx;
 }
 function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useLocalStorage<User>("moodmix_user", null);
-  const signInDemo = async (name: string, email: string) =>
-    setUser({ id: "demo_" + Date.now(), name, email });
-  const signOut = async () => setUser(null);
+  const [user, setUser] = useState<User>(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/auth/status`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setUser(d?.user ?? null))
+      .catch(() => setUser(null));
+  }, []);
+
+  const signOut = async () => {
+    try {
+      await fetch(`${API_BASE}/auth/logout`, { credentials: "include" });
+    } catch {}
+    setUser(null);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, signInDemo, signOut }}>
+    <AuthContext.Provider value={{ user, signOut }}>
       {children}
     </AuthContext.Provider>
   );
@@ -211,7 +221,7 @@ const ACCENTS: Record<
  * - Persistent theme & accent
  * - Profile with Do-Not-Play chips
  * - Saved Library (save/delete)
- * - Demo sign-in modal; header switches to avatar + sign-out
+ * - Session-based login; header switches to avatar + sign-out
  */
 
 export default function App() {
@@ -288,7 +298,6 @@ function RootApp() {
   const [prompt, setPrompt] = useState("");
   const [targetMinutes, setTargetMinutes] = useState<number | "">(30);
   const [instrumentalOnly, setInstrumentalOnly] = useState(false);
-  const [authOpen, setAuthOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [deviceId, setDeviceId] = useState<string | null>(null);
@@ -377,11 +386,25 @@ function RootApp() {
       (window as any).onSpotifyWebPlaybackSDKReady = null;
     };
   }, []);
-  const { user, signInDemo, signOut } = useAuth();
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    setServiceLogins({ spotify: false, apple: false, youtube: false });
+    try {
+      for (const s of ["spotify", "apple", "youtube"]) {
+        localStorage.removeItem(`moodmix_login_${s}`);
+      }
+    } catch {}
+  };
 
   // Generate mix
 
   const createMix = async () => {
+    if (!user) {
+      window.location.href = `${API_BASE}/auth/login`;
+      return;
+    }
     if (!prompt.trim() || isGenerating) return;
     setIsGenerating(true);
 
@@ -395,6 +418,7 @@ function RootApp() {
       const res = await fetch(`${API_BASE}/api/spotify/mix`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           prompt,
           profile,
@@ -485,7 +509,7 @@ function RootApp() {
                 {user.name}
               </span>
               <button
-                onClick={() => signOut()}
+                onClick={handleSignOut}
                 className="px-3 py-1 rounded border border-zinc-700/80 hover:bg-zinc-900/70 transition"
               >
                 Sign out
@@ -493,7 +517,9 @@ function RootApp() {
             </div>
           ) : (
             <button
-              onClick={() => setAuthOpen(true)}
+              onClick={() =>
+                (window.location.href = `${API_BASE}/auth/login`)
+              }
               className={`${
                 GRAD_BTN?.[accent] ?? "bg-indigo-600"
               } text-white px-3 py-1 rounded-xl shadow-sm active:scale-95 transition focus:outline-none focus:ring-2 focus:ring-white/40`}
@@ -519,14 +545,16 @@ function RootApp() {
         <div className="sm:hidden absolute right-3 top-3">
           {user ? (
             <button
-              onClick={() => signOut()}
+              onClick={handleSignOut}
               className="px-3 py-1 rounded-lg text-xs border border-zinc-700/80 bg-zinc-900/70"
             >
               Sign out
             </button>
           ) : (
             <button
-              onClick={() => setAuthOpen(true)}
+              onClick={() =>
+                (window.location.href = `${API_BASE}/auth/login`)
+              }
               className={`${
                 GRAD_BTN?.[accent] ?? "bg-indigo-600"
               } text-white px-3 py-1 rounded-lg text-xs shadow-sm active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/40`}
@@ -655,6 +683,10 @@ function RootApp() {
                       <Button
                         onClick={async () => {
                           if (!currentMix) return;
+                          if (!user) {
+                            window.location.href = `${API_BASE}/auth/login`;
+                            return;
+                          }
                           try {
                             const res = await saveToSpotify(currentMix);
                             setEmbedUrl(res.embedUrl ?? null);
@@ -834,15 +866,6 @@ function RootApp() {
         </section>
       </main>
 
-      {authOpen && (
-        <AuthModal
-          onClose={() => setAuthOpen(false)}
-          onSubmit={async (n, e) => {
-            await signInDemo(n, e);
-            setAuthOpen(false);
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -1369,55 +1392,6 @@ function MixCard({
             </Button>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function AuthModal({
-  onClose,
-  onSubmit,
-}: {
-  onClose: () => void;
-  onSubmit: (name: string, email: string) => void;
-}) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-700/60 bg-zinc-900 p-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Sign in (demo)</h3>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1 hover:bg-zinc-800"
-            aria-label="Close"
-          >
-            ✕
-          </button>
-        </div>
-        <p className="mt-2 text-sm text-zinc-400">
-          This preview doesn’t connect to real auth yet. Swap to
-          Supabase/Firebase/NextAuth later.
-        </p>
-        <div className="mt-3 grid gap-2">
-          <Input label="Name" value={name} onChange={setName} />
-          <Input label="Email" value={email} onChange={setEmail} />
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="rounded-xl border border-zinc-700/60 px-3 py-2 text-sm hover:bg-zinc-800"
-          >
-            Cancel
-          </button>
-          <Button
-            onClick={() => onSubmit(name, email)}
-            className="bg-indigo-600 hover:bg-indigo-500"
-          >
-            Continue
-          </Button>
-        </div>
       </div>
     </div>
   );
