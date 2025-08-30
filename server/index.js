@@ -7,7 +7,7 @@ import cookieParser from "cookie-parser";
 
 const app = express();
 app.use(cookieParser());
-app.use(cors());
+app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
 app.use(express.json());
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
@@ -97,6 +97,13 @@ app.get("/auth/callback", async (req, res) => {
     console.error(e);
     res.status(500).send("Auth failed");
   }
+});
+
+app.get("/auth/logout", (req, res) => {
+  const sid = req.cookies.sid;
+  if (sid) sessions.delete(sid);
+  res.clearCookie("sid", { httpOnly: true, sameSite: "lax" });
+  res.json({ ok: true });
 });
 
 function requireAuth(req, res, next) {
